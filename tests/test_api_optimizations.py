@@ -86,10 +86,12 @@ class ApiOptimizationTests(unittest.TestCase):
         self._original_text_queue_cap = main_app.TEXT_MAX_QUEUED_REQUESTS
         self._original_file_queue_cap = main_app.FILE_MAX_QUEUED_REQUESTS
         self._original_models_queue_cap = main_app.MODELS_MAX_QUEUED_REQUESTS
+        self._original_local_ignore_limits = main_app.LOCAL_DEV_IGNORE_LIMITS
 
         main_app.app.router.on_startup = []
         self.stub = StubModelOrchestrator()
         main_app.model_orchestrator = self.stub
+        main_app.LOCAL_DEV_IGNORE_LIMITS = False
         main_app.rate_limit_state.clear()
         main_app.request_queue_manager = main_app.RequestQueueManager(
             main_app.MAX_CONCURRENT_REQUESTS, main_app.MAX_QUEUED_REQUESTS)
@@ -124,6 +126,7 @@ class ApiOptimizationTests(unittest.TestCase):
         main_app.TEXT_MAX_QUEUED_REQUESTS = self._original_text_queue_cap
         main_app.FILE_MAX_QUEUED_REQUESTS = self._original_file_queue_cap
         main_app.MODELS_MAX_QUEUED_REQUESTS = self._original_models_queue_cap
+        main_app.LOCAL_DEV_IGNORE_LIMITS = self._original_local_ignore_limits
         main_app.rate_limit_state.clear()
 
     def test_text_endpoint_passes_include_humanizer_flag(self):

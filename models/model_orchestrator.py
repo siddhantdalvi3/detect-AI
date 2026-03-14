@@ -35,6 +35,8 @@ class ModelOrchestrator:
 
         self.enable_async_heavy = self._parse_bool_env(
             "ENABLE_ASYNC_HEAVY_ANALYSIS", True)
+        self.local_dev_ignore_limits = self._parse_bool_env(
+            "LOCAL_DEV_IGNORE_LIMITS", False)
         self.async_pending_limit = int(os.getenv("ASYNC_PENDING_LIMIT", "50"))
         self.async_result_ttl_seconds = int(
             os.getenv("ASYNC_RESULT_TTL_SECONDS", "1800"))
@@ -238,6 +240,21 @@ class ModelOrchestrator:
 
         try:
             fast_path = self._run_fast_path(text)
+
+            # In local dev limit-bypass mode, always run full analysis including heavy models.
+            if self.local_dev_ignore_limits:
+                heavy_results = self._run_heavy_models(text)
+                combined_results = {
+                    **fast_path["model_results"],
+                    **heavy_results
+                }
+                response = self._compose_response(
+                    text,
+                    combined_results,
+                    include_humanizer=include_humanizer)
+                response["processing_status"] = "completed"
+                response["local_full_analysis"] = True
+                return response
 
             if self.enable_cascade and fast_path["is_uncertain"]:
                 if self.enable_async_heavy and allow_delayed:

@@ -272,6 +272,7 @@ Traffic protection behavior:
 - Requests waiting in queue too long return HTTP `503`.
 - Requests exceeding processing timeout return HTTP `504`.
 - Set `LOCAL_DEV_IGNORE_LIMITS=true` in local development to bypass rate/queue/timeout and file-size limits.
+- With `LOCAL_DEV_IGNORE_LIMITS=true`, the detector also runs full analysis (fast + heavy models) instead of cascade skipping.
 
 UI behavior while analyzing:
 
