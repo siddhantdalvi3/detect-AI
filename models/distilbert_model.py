@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, Dict, Tuple
 
 import numpy as np
@@ -15,11 +16,13 @@ class DistilBERTModel:
     Uses pre-trained DistilBERT for sequence classification
     """
 
-    def __init__(self, model_name: str = "Hello-SimpleAI/chatgpt-detector-roberta"):
+    def __init__(self,
+                 model_name: str = "Hello-SimpleAI/chatgpt-detector-roberta"):
         self.model_name = model_name
         self.tokenizer = None
         self.model = None
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        if hasattr(torch.backends,
+                   "mps") and torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -39,15 +42,25 @@ class DistilBERTModel:
             self.model = self.model.to(self.device)
             self.model.eval()
 
-            logger.info(f"DistilBERT model initialized on device: {self.device}")
+            enable_int8 = os.getenv(
+                "ENABLE_INT8_COMPACT_MODEL",
+                "true").lower() in {"1", "true", "t", "yes", "y", "on"}
+            if enable_int8 and self.device.type == "cpu":
+                self.model = torch.quantization.quantize_dynamic(
+                    self.model, {nn.Linear}, dtype=torch.qint8)
+                logger.info(
+                    "Enabled dynamic int8 quantization for compact model")
+
+            logger.info(
+                f"DistilBERT model initialized on device: {self.device}")
 
         except Exception as e:
             logger.error(f"Error initializing DistilBERT model: {e}")
             raise
 
-    def predict(
-        self, text: str, max_length: int = 512
-    ) -> Tuple[float, Dict[str, float]]:
+    def predict(self,
+                text: str,
+                max_length: int = 512) -> Tuple[float, Dict[str, float]]:
         """
         Predict if text is AI-generated
         Returns: (ai_probability, confidence_scores)
@@ -56,6 +69,9 @@ class DistilBERTModel:
             return 0.0, {"ai": 0.0, "human": 1.0}
 
         try:
+            if self.tokenizer is None or self.model is None:
+                return 0.0, {"ai": 0.0, "human": 1.0}
+
             # Tokenize input
             inputs = self.tokenizer(
                 text,
@@ -93,21 +109,20 @@ class DistilBERTModel:
         results = []
         for text in texts:
             ai_prob, confidence = self.predict(text, max_length)
-            results.append(
-                {
-                    "text": text,
-                    "ai_probability": ai_prob,
-                    "confidence_scores": confidence,
-                    "prediction": "AI" if ai_prob > 0.5 else "Human",
-                }
-            )
+            results.append({
+                "text": text,
+                "ai_probability": ai_prob,
+                "confidence_scores": confidence,
+                "prediction": "AI" if ai_prob > 0.5 else "Human",
+            })
 
         return results
 
     def load_model(self, model_path: str):
         """Load pre-trained model weights"""
         try:
-            self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_path)
             self.model = self.model.to(self.device)
             self.model.eval()
             logger.info(f"Loaded model from {model_path}")
@@ -118,6 +133,9 @@ class DistilBERTModel:
     def save_model(self, model_path: str):
         """Save model weights"""
         try:
+            if self.model is None or self.tokenizer is None:
+                raise RuntimeError(
+                    "Model and tokenizer must be initialized before save")
             self.model.save_pretrained(model_path)
             self.tokenizer.save_pretrained(model_path)
             logger.info(f"Saved model to {model_path}")

@@ -19,8 +19,8 @@ class LineAnalyzer:
         sentence_endings = r"(?<=[.!?])\s+"
         sentences = re.split(sentence_endings, text.strip())
 
-        # Filter out empty sentences and short fragments to reduce noisy highlights
-        return [s.strip() for s in sentences if len(s.strip()) > 20]
+        # Keep all non-empty fragments so detailed output never drops pasted content.
+        return [s.strip() for s in sentences if s.strip()]
 
     @staticmethod
     def analyze_line_by_line(text: str, model_orchestrator) -> Dict[str, Any]:
@@ -32,14 +32,18 @@ class LineAnalyzer:
 
         if not sentences:
             return {
-                "overall_analysis": {"ai_probability": 0.0, "prediction": "Human"},
+                "overall_analysis": {
+                    "ai_probability": 0.0,
+                    "prediction": "Human"
+                },
                 "sentence_analysis": [],
                 "model_breakdown": {},
             }
 
         sentence_results = []
         model_predictions = {
-            model_name: [] for model_name in model_orchestrator.models.keys()
+            model_name: []
+            for model_name in model_orchestrator.models.keys()
         }
 
         for sentence in sentences:
@@ -67,15 +71,13 @@ class LineAnalyzer:
 
             sentence_result["overall_ai_prob"] = avg_prob
             sentence_result["overall_prediction"] = (
-                "AI"
-                if (avg_prob >= 0.72 or (ai_votes >= 2 and avg_prob >= 0.6))
-                else "Human"
-            )
+                "AI" if (avg_prob >= 0.72 or
+                         (ai_votes >= 2 and avg_prob >= 0.6)) else "Human")
             sentence_results.append(sentence_result)
 
         overall_ai_prob = sum(
-            result["overall_ai_prob"] for result in sentence_results
-        ) / len(sentence_results)
+            result["overall_ai_prob"]
+            for result in sentence_results) / len(sentence_results)
 
         model_breakdown = {}
         for model_name, predictions in model_predictions.items():
@@ -87,13 +89,11 @@ class LineAnalyzer:
                 "ai_percentage": (ai_count / len(predictions)) * 100,
             }
 
-        ai_sentence_count = sum(
-            1 for result in sentence_results if result["overall_prediction"] == "AI"
-        )
+        ai_sentence_count = sum(1 for result in sentence_results
+                                if result["overall_prediction"] == "AI")
         ai_sentence_ratio = ai_sentence_count / len(sentence_results)
-        doc_prediction = (
-            "AI" if (ai_sentence_ratio >= 0.4 or overall_ai_prob >= 0.62) else "Human"
-        )
+        doc_prediction = ("AI" if (ai_sentence_ratio >= 0.4
+                                   or overall_ai_prob >= 0.62) else "Human")
 
         return {
             "overall_analysis": {
@@ -107,7 +107,8 @@ class LineAnalyzer:
         }
 
     @staticmethod
-    def generate_highlighted_html(text: str, analysis_results: Dict[str, Any]) -> str:
+    def generate_highlighted_html(text: str,
+                                  analysis_results: Dict[str, Any]) -> str:
         """
         Generate HTML with highlighted AI-generated sentences
         """
@@ -140,8 +141,7 @@ class LineAnalyzer:
 
                 highlighted_html += (
                     f'<span class="{css_class}" data-bs-toggle="tooltip" '
-                    f'title="{escaped_tooltip}">{escaped_sentence}</span>'
-                )
+                    f'title="{escaped_tooltip}">{escaped_sentence}</span>')
             else:
                 highlighted_html += f"<span>{html.escape(sentence, quote=False)}</span>"
 
@@ -151,12 +151,15 @@ class LineAnalyzer:
 
     @staticmethod
     def get_detailed_model_breakdown(
-        analysis_results: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        analysis_results: Dict[str, Any], ) -> Dict[str, Any]:
         """
         Generate detailed breakdown of which models detected AI content
         """
-        breakdown = {"by_model": {}, "consensus_analysis": {}, "sentence_level": []}
+        breakdown = {
+            "by_model": {},
+            "consensus_analysis": {},
+            "sentence_level": []
+        }
 
         # Model-specific breakdown
         for model_name, stats in analysis_results["model_breakdown"].items():
@@ -168,55 +171,51 @@ class LineAnalyzer:
 
         # Consensus analysis (where all models agree)
         sentences = analysis_results["sentence_analysis"]
-        all_ai = sum(
-            1
-            for s in sentences
-            if all(m["prediction"] == "AI" for m in s["models"].values())
-        )
-        all_human = sum(
-            1
-            for s in sentences
-            if all(m["prediction"] == "Human" for m in s["models"].values())
-        )
+        all_ai = sum(1 for s in sentences if all(
+            m["prediction"] == "AI" for m in s["models"].values()))
+        all_human = sum(1 for s in sentences if all(
+            m["prediction"] == "Human" for m in s["models"].values()))
         mixed = len(sentences) - all_ai - all_human
 
         breakdown["consensus_analysis"] = {
-            "all_models_agree_ai": all_ai,
-            "all_models_agree_human": all_human,
-            "mixed_opinions": mixed,
-            "consensus_percentage": ((all_ai + all_human) / len(sentences)) * 100
-            if sentences
-            else 0,
+            "all_models_agree_ai":
+            all_ai,
+            "all_models_agree_human":
+            all_human,
+            "mixed_opinions":
+            mixed,
+            "consensus_percentage":
+            ((all_ai + all_human) / len(sentences)) * 100 if sentences else 0,
         }
 
         # Sentence-level model agreement
         for i, sentence_data in enumerate(sentences):
             ai_models = [
-                name
-                for name, data in sentence_data["models"].items()
+                name for name, data in sentence_data["models"].items()
                 if data["prediction"] == "AI"
             ]
             human_models = [
-                name
-                for name, data in sentence_data["models"].items()
+                name for name, data in sentence_data["models"].items()
                 if data["prediction"] == "Human"
             ]
 
-            breakdown["sentence_level"].append(
-                {
-                    "sentence_index": i,
-                    "sentence_preview": sentence_data["sentence"][:50] + "..."
-                    if len(sentence_data["sentence"]) > 50
-                    else sentence_data["sentence"],
-                    "ai_models": ai_models,
-                    "human_models": human_models,
-                    "agreement": "unanimous_ai"
-                    if not human_models and ai_models
-                    else "unanimous_human"
-                    if not ai_models and human_models
-                    else "mixed",
-                    "ai_probability": sentence_data["overall_ai_prob"],
-                }
-            )
+            breakdown["sentence_level"].append({
+                "sentence_index":
+                i,
+                "sentence_preview":
+                sentence_data["sentence"][:50] +
+                "..." if len(sentence_data["sentence"]) > 50 else
+                sentence_data["sentence"],
+                "ai_models":
+                ai_models,
+                "human_models":
+                human_models,
+                "agreement":
+                "unanimous_ai"
+                if not human_models and ai_models else "unanimous_human"
+                if not ai_models and human_models else "mixed",
+                "ai_probability":
+                sentence_data["overall_ai_prob"],
+            })
 
         return breakdown
