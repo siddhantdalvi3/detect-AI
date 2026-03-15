@@ -36,7 +36,7 @@ A powerful Python application that detects AI-generated content using multiple m
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.11+
 - uv package manager
 - 2GB+ free disk space for models
 
@@ -338,6 +338,22 @@ logging.basicConfig(level=logging.DEBUG)
 ```
 
 ## Development
+
+### Python 3.11 Upgrade Notes
+
+The project target was upgraded from Python 3.9 to Python 3.11.
+
+Key dependency updates after lock/sync:
+
+- fastapi: 0.133.1
+- starlette: 0.52.1
+- uvicorn: 0.41.0
+- torch: 2.10.0
+- transformers: 5.2.0
+- sentence-transformers: 5.2.3
+- numpy: 2.4.2
+- pandas: 3.0.1
+- scikit-learn: 1.8.0
 
 ### Adding New Models
 

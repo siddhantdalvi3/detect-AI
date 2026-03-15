@@ -30,20 +30,23 @@ class ModelOrchestrator:
 
         self.enable_cascade = self._parse_bool_env("ENABLE_CASCADE_MODE", True)
         self.fast_ai_threshold = float(os.getenv("FAST_AI_THRESHOLD", "0.72"))
-        self.fast_human_threshold = float(
-            os.getenv("FAST_HUMAN_THRESHOLD", "0.28"))
+        self.fast_human_threshold = float(os.getenv("FAST_HUMAN_THRESHOLD", "0.28"))
 
         self.enable_async_heavy = self._parse_bool_env(
-            "ENABLE_ASYNC_HEAVY_ANALYSIS", True)
+            "ENABLE_ASYNC_HEAVY_ANALYSIS", True
+        )
         self.local_dev_ignore_limits = self._parse_bool_env(
-            "LOCAL_DEV_IGNORE_LIMITS", False)
+            "LOCAL_DEV_IGNORE_LIMITS", False
+        )
         self.async_pending_limit = int(os.getenv("ASYNC_PENDING_LIMIT", "50"))
         self.async_result_ttl_seconds = int(
-            os.getenv("ASYNC_RESULT_TTL_SECONDS", "1800"))
+            os.getenv("ASYNC_RESULT_TTL_SECONDS", "1800")
+        )
         self._jobs = {}
         self._jobs_lock = threading.Lock()
         self._executor = ThreadPoolExecutor(
-            max_workers=max(1, int(os.getenv("ASYNC_HEAVY_WORKERS", "1"))))
+            max_workers=max(1, int(os.getenv("ASYNC_HEAVY_WORKERS", "1")))
+        )
 
         self._initialize_models()
 
@@ -76,8 +79,9 @@ class ModelOrchestrator:
         now = time.time()
         with self._jobs_lock:
             stale = [
-                job_id for job_id, job in self._jobs.items() if now -
-                job.get("updated_at", now) > self.async_result_ttl_seconds
+                job_id
+                for job_id, job in self._jobs.items()
+                if now - job.get("updated_at", now) > self.async_result_ttl_seconds
             ]
             for job_id in stale:
                 self._jobs.pop(job_id, None)
@@ -135,9 +139,9 @@ class ModelOrchestrator:
         if not model_results:
             return self._create_empty_response()
 
-        ensemble_prob = sum(
-            r["ai_probability"]
-            for r in model_results.values()) / len(model_results)
+        ensemble_prob = sum(r["ai_probability"] for r in model_results.values()) / len(
+            model_results
+        )
 
         response = {
             "text": text,
@@ -148,8 +152,7 @@ class ModelOrchestrator:
         }
 
         if include_humanizer and ensemble_prob > 0.5:
-            response["humanizer_suggestions"] = self.humanizer.humanize_text(
-                text)
+            response["humanizer_suggestions"] = self.humanizer.humanize_text(text)
 
         return response
 
@@ -158,8 +161,10 @@ class ModelOrchestrator:
 
         with self._jobs_lock:
             pending_jobs = sum(
-                1 for job in self._jobs.values()
-                if job.get("status") in {"queued", "processing"})
+                1
+                for job in self._jobs.values()
+                if job.get("status") in {"queued", "processing"}
+            )
             if pending_jobs >= self.async_pending_limit:
                 return None
 
@@ -182,7 +187,8 @@ class ModelOrchestrator:
                 heavy_results = self._run_heavy_models(text)
                 combined = {**fast_path["model_results"], **heavy_results}
                 result = self._compose_response(
-                    text, combined, include_humanizer=include_humanizer)
+                    text, combined, include_humanizer=include_humanizer
+                )
                 result["processing_status"] = "completed"
 
                 with self._jobs_lock:
@@ -244,48 +250,37 @@ class ModelOrchestrator:
             # In local dev limit-bypass mode, always run full analysis including heavy models.
             if self.local_dev_ignore_limits:
                 heavy_results = self._run_heavy_models(text)
-                combined_results = {
-                    **fast_path["model_results"],
-                    **heavy_results
-                }
+                combined_results = {**fast_path["model_results"], **heavy_results}
                 response = self._compose_response(
-                    text,
-                    combined_results,
-                    include_humanizer=include_humanizer)
+                    text, combined_results, include_humanizer=include_humanizer
+                )
                 response["processing_status"] = "completed"
                 response["local_full_analysis"] = True
                 return response
 
             if self.enable_cascade and fast_path["is_uncertain"]:
                 if self.enable_async_heavy and allow_delayed:
-                    request_id = self._submit_heavy_job(
-                        text, include_humanizer)
+                    request_id = self._submit_heavy_job(text, include_humanizer)
                     if request_id:
                         response = self._compose_response(
-                            text,
-                            fast_path["model_results"],
-                            include_humanizer=False)
+                            text, fast_path["model_results"], include_humanizer=False
+                        )
                         response["processing_status"] = "pending"
                         response["request_id"] = request_id
                         response["heavy_analysis_pending"] = True
                         return response
 
                 heavy_results = self._run_heavy_models(text)
-                combined_results = {
-                    **fast_path["model_results"],
-                    **heavy_results
-                }
+                combined_results = {**fast_path["model_results"], **heavy_results}
                 response = self._compose_response(
-                    text,
-                    combined_results,
-                    include_humanizer=include_humanizer)
+                    text, combined_results, include_humanizer=include_humanizer
+                )
                 response["processing_status"] = "completed"
                 return response
 
             response = self._compose_response(
-                text,
-                fast_path["model_results"],
-                include_humanizer=include_humanizer)
+                text, fast_path["model_results"], include_humanizer=include_humanizer
+            )
             response["processing_status"] = "completed"
             response["cascade_skipped_heavy"] = True
             return response
@@ -310,7 +305,8 @@ class ModelOrchestrator:
 
             if not FileProcessor.is_valid_text(text):
                 return self._create_error_response(
-                    "", "Text is too short or invalid for analysis")
+                    "", "Text is too short or invalid for analysis"
+                )
 
             processed_text = FileProcessor.process_input(text)
             return self.detect_ai(
@@ -321,8 +317,7 @@ class ModelOrchestrator:
 
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {e}")
-            return self._create_error_response(
-                "", f"File processing error: {str(e)}")
+            return self._create_error_response("", f"File processing error: {str(e)}")
 
     def batch_detect(self, texts: List[str]) -> List[Dict[str, Any]]:
         if not texts:
@@ -345,34 +340,27 @@ class ModelOrchestrator:
             line_analysis = LineAnalyzer.analyze_line_by_line(text, self)
             standard_result = self.detect_ai(text)
             highlighted_html = LineAnalyzer.generate_highlighted_html(
-                text, line_analysis)
-            model_breakdown = LineAnalyzer.get_detailed_model_breakdown(
-                line_analysis)
+                text, line_analysis
+            )
+            model_breakdown = LineAnalyzer.get_detailed_model_breakdown(line_analysis)
 
             return {
-                "text":
-                text,
-                "highlighted_html":
-                highlighted_html,
-                "overall_analysis":
-                line_analysis["overall_analysis"],
-                "sentence_analysis":
-                line_analysis["sentence_analysis"],
-                "model_breakdown":
-                model_breakdown,
-                "standard_result":
-                standard_result,
-                "humanizer_suggestions":
-                standard_result.get("humanizer_suggestions", []),
+                "text": text,
+                "highlighted_html": highlighted_html,
+                "overall_analysis": line_analysis["overall_analysis"],
+                "sentence_analysis": line_analysis["sentence_analysis"],
+                "model_breakdown": model_breakdown,
+                "standard_result": standard_result,
+                "humanizer_suggestions": standard_result.get(
+                    "humanizer_suggestions", []
+                ),
             }
 
         except Exception as e:
             logger.error(f"Error in line-by-line AI detection: {e}")
-            return self._create_error_response(
-                text, f"Line analysis error: {str(e)}")
+            return self._create_error_response(text, f"Line analysis error: {str(e)}")
 
-    def detect_ai_from_file_line_by_line(self,
-                                         file_path: str) -> Dict[str, Any]:
+    def detect_ai_from_file_line_by_line(self, file_path: str) -> Dict[str, Any]:
         try:
             from ..file_handlers.file_processor import FileProcessor
 
@@ -380,40 +368,39 @@ class ModelOrchestrator:
 
             if not FileProcessor.is_valid_text(text):
                 return self._create_error_response(
-                    "", "Text is too short or invalid for analysis")
+                    "", "Text is too short or invalid for analysis"
+                )
 
             processed_text = FileProcessor.process_input(text)
             return self.detect_ai_line_by_line(processed_text)
 
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {e}")
-            return self._create_error_response(
-                "", f"File processing error: {str(e)}")
+            return self._create_error_response("", f"File processing error: {str(e)}")
 
     def get_model_info(self) -> Dict[str, Any]:
         model_info = {}
 
         for model_name, model in self.models.items():
             model_info[model_name] = {
-                "model_type":
-                type(model).__name__ if model else "NotLoaded",
-                "device":
-                str(model.device)
-                if model is not None and hasattr(model, "device") else "cpu",
-                "status":
-                "loaded" if model is not None else "lazy_not_loaded",
+                "model_type": type(model).__name__ if model else "NotLoaded",
+                "device": str(model.device)
+                if model is not None and hasattr(model, "device")
+                else "cpu",
+                "status": "loaded" if model is not None else "lazy_not_loaded",
             }
 
         model_info["humanizer"] = {
-            "model_type":
-            type(self.humanizer).__name__ if self.humanizer else "None",
+            "model_type": type(self.humanizer).__name__ if self.humanizer else "None",
             "status": "loaded" if self.humanizer else "not_loaded",
         }
 
         with self._jobs_lock:
             pending_jobs = sum(
-                1 for job in self._jobs.values()
-                if job.get("status") in {"queued", "processing"})
+                1
+                for job in self._jobs.values()
+                if job.get("status") in {"queued", "processing"}
+            )
 
         model_info["async_heavy"] = {
             "enabled": self.enable_async_heavy,
@@ -434,8 +421,7 @@ class ModelOrchestrator:
             "error": "Invalid or empty input text",
         }
 
-    def _create_error_response(self, text: str,
-                               error_msg: str) -> Dict[str, Any]:
+    def _create_error_response(self, text: str, error_msg: str) -> Dict[str, Any]:
         return {
             "text": text,
             "ensemble_score": 0.0,
